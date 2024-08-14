@@ -40,6 +40,8 @@ class JAXCRT:
         xy_patience=20,
         x_dropout_rate=0.0,
         xy_dropout_rate=0.0,
+        xy_residual=False,
+        xy_activation="relu",
         x_patience=20,
         n_hidden_xy=128,
         n_epochs=100,
@@ -48,6 +50,7 @@ class JAXCRT:
         percent_dev=0.5,
         precision=None,
         xy_linear=False,
+        x_linear=False,
         x_early_stopping_metric="elbo",
         x_tx=None,
         xy_tx=None,
@@ -55,6 +58,7 @@ class JAXCRT:
         xy_include_batch=False,
         xy_loss="mse",
         log1p_factor=1e6,
+        split_seed=0,
     ):
         self.n_genes = adata.X.shape[1]
         self.n_proteins = adata.obsm["protein_expression"].shape[-1]
@@ -111,6 +115,7 @@ class JAXCRT:
             precision=precision,
             likelihood=x_likelihood,
             dropout_rate=x_dropout_rate,
+            linear_decoder=x_linear,
         )
         self.xy_include_batch = xy_include_batch
         self.xy_input_size = (
@@ -131,6 +136,8 @@ class JAXCRT:
                 n_features=self.n_proteins,
                 dropout_rate=xy_dropout_rate,
                 loss_type=xy_loss,
+                residual=xy_residual,
+                activation=xy_activation,
             )
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -151,7 +158,7 @@ class JAXCRT:
         self.adata_log = adata_log
 
         n_obs = adata.X.shape[0]
-        np.random.seed(0)
+        np.random.seed(split_seed)
         self.is_dev = np.random.random(n_obs) <= percent_dev
         self.adata = adata
         self.adata.obs.loc[:, "is_dev"] = self.is_dev

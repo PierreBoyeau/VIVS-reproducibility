@@ -130,6 +130,34 @@ class FlaxDecoder(nn.Module):
         logits = self.zi_logits3(logits)
         probs = nn.sigmoid(logits)
         return h, self.disp.ravel(), probs
+    
+    
+class FlaxLinearDecoder(nn.Module):
+    """Decoder for Jax VAE."""
+
+    n_input: int
+    n_hidden: int
+    precision: str
+
+    def setup(self):
+        """Setup decoder."""
+        self.dense1 = nn.Dense(self.n_input, precision=self.precision)
+        self.dense2 = nn.Dense(self.n_input, precision=self.precision)
+        self.disp = self.param(
+            "disp", lambda rng, shape: jax.random.normal(rng, shape), (self.n_input, 1)
+        )
+        self.zi_logits1 = nn.Dense(self.n_hidden)
+
+    def __call__(self, z: jnp.ndarray, batch: jnp.ndarray, training: bool = False):
+        """Forward pass."""
+
+        h = self.dense1(z)
+        h += self.dense2(batch)
+        h = nn.softmax(h)
+
+        logits = self.zi_logits1(z)
+        probs = nn.sigmoid(logits)
+        return h, self.disp.ravel(), probs
 
 
 class SCVICRT(nn.Module):
@@ -139,13 +167,19 @@ class SCVICRT(nn.Module):
     precision: str
     likelihood: str = "nb"
     dropout_rate: float = 0.0
+    linear_decoder: bool = False
 
     def setup(self):
         self.encoder = FlaxEncoder(
             self.n_input, self.n_latent, self.n_hidden, precision=self.precision
         )
-        self.decoder = FlaxDecoder(
-            self.n_input, self.n_hidden, precision=self.precision
+        if self.linear_decoder:
+            self.decoder = FlaxLinearDecoder(
+                self.n_input, self.n_hidden, precision=self.precision
+            )
+        else:
+            self.decoder = FlaxDecoder(
+                self.n_input, self.n_hidden, precision=self.precision
         )
         self.dropout = nn.Dropout(rate=self.dropout_rate)
 
@@ -194,6 +228,8 @@ class ImportanceScorer(nn.Module):
     n_features: int
     dropout_rate: float
     loss_type: str = "mse"
+    residual: bool = False
+    activation: str = "relu"
 
     def setup(self):
         self.dense1 = nn.Dense(features=self.n_hidden)
@@ -214,6 +250,12 @@ class ImportanceScorer(nn.Module):
         #     (self.n_features,),
         # )
         self.log_std = 0.0
+        if self.activation == "relu":
+            self.activation_fn = nn.relu
+        elif self.activation == "leaky_relu":
+            self.activation_fn = nn.leaky_relu
+        elif self.activation == "tanh":
+            self.activation_fn = nn.tanh
 
     def __call__(self, x, y, training: bool = False):
         is_eval = not training
@@ -221,9 +263,12 @@ class ImportanceScorer(nn.Module):
         h = self.dense1(x)
         h = self.norm1(h, use_running_average=is_eval)
         # h = self.norm1(h)
-        h = nn.leaky_relu(h)
+        h = self.activation_fn(h)
         h = self.dropout1(h, deterministic=is_eval)
-
+        if self.residual:
+            h = self.dense3(h) + self.dense_res(x)
+        else:
+            h = self.dense3(h)
         # h = self.dense2(h)
         # h = self.dense_res(x) + h
         # all_loss = -dist.Normal(h, jnp.exp(self.log_std)).log_prob(y)
@@ -233,7 +278,7 @@ class ImportanceScorer(nn.Module):
         # # h = self.norm2(h)
         # h = nn.leaky_relu(h)
         # h = self.dense3(h) + self.dense_res(x)
-        h = self.dense3(h)
+
 
         if self.loss_type == "mse":
             all_loss = -dist.Normal(h, jnp.exp(self.log_std)).log_prob(y)

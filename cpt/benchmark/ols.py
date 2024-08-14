@@ -153,6 +153,8 @@ class ElementWiseOLS:
 
     def compute(self):
         X = self.adata_log.X
+        if issparse(X):
+            X = X.toarray()
         n_proteins = self.adata_log.obsm["protein_expression"].shape[-1]
         n_genes = X.shape[-1]
         results = pd.DataFrame()
@@ -170,9 +172,13 @@ class ElementWiseOLS:
                 beta = ols_res.params[1]
                 return pvalues, beta
 
-            res = Parallel(n_jobs=self.n_jobs, prefer="threads")(
-                delayed(_fit_gene)(gene) for gene in np.arange(n_genes)
-            )
+            res = []
+            for gene in tqdm(np.arange(n_genes)):
+                pvalues, beta = _fit_gene(gene)
+                res.append([pvalues, beta])
+            # res = Parallel(n_jobs=self.n_jobs, prefer="threads")(
+            #     delayed(_fit_gene)(gene) for gene in np.arange(n_genes)
+            # )
             df_  = (
                 pd.DataFrame(res, columns=["pvalue", "beta"])
                 .assign(

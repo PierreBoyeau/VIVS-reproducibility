@@ -16,8 +16,7 @@ os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".45"
 
 # %%
 def parse_kwargs():
-    parser = argparse.ArgumentParser(description="Process some integers.")
-
+    parser = argparse.ArgumentParser()
     parser.add_argument("--sparsity", type=float, default=0.05)
     parser.add_argument("--data_noise", type=str, default="gaussian")
     parser.add_argument("--beta_scale", type=float, default=1.0)
@@ -45,6 +44,7 @@ def parse_kwargs():
     parser.add_argument(
         "--randomforest", dest="randomforest", default=False, action="store_true"
     )
+    parser.add_argument("--split_seed", type=int, default=0)
     return vars(parser.parse_args())
 
 
@@ -84,6 +84,7 @@ TAG = args.get("tag", "no")
 LARGEN = args.get("largen", False)
 BASE_DIR = args.get("base_dir", "results/semisynthetic")
 RANDOMFOREST = args.get("randomforest", False)
+SPLIT_SEED = args.get("split_seed", 0)
 
 UUID = uuid.uuid4().hex
 # BASE_DIR = "results/jax_experiments_finalv1"
@@ -128,11 +129,16 @@ gene_influences = (
 n_clusters = [10, 100, 1000, n_genes]
 
 res_df = []
-for xy_linear in [True, False]:
-    suffix = "_linear" if xy_linear else ""
+for setup in [
+    dict(xy_linear=False, x_linear=True, tag="_x_linear"),
+    dict(xy_linear=True, x_linear=False, tag="_xy_linear"),
+    dict(xy_linear=False, x_linear=False, tag=""),
+]:
+    suffix = setup["tag"]
     jax_crtres = JAXCRT(
         adata=adata,
-        xy_linear=xy_linear,
+        xy_linear=setup["xy_linear"],
+        x_linear=setup["x_linear"],
         batch_key=None,
         n_latent=N_LATENT,
         n_hidden=128,
@@ -150,6 +156,7 @@ for xy_linear in [True, False]:
         n_mc_samples=N_MC_SAMPLES,
         percent_dev=PERCENT_DEV,
         precision=None,
+        split_seed=SPLIT_SEED,
     )
     jax_crtres.train_all()
     eval_adata = adata[(~jax_crtres.adata.obs["is_dev"].values)].copy()

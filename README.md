@@ -17,3 +17,11 @@ bash script_semisynth.sh
 bash nanostring.sh
 bash citeseq.sh
 ```
+
+
+for the perturb-seq experiment, start by downloading the data from Frangieh et al., 2021 from [here](https://github.com/theislab/sc-pert).
+
+The experiment can then be run using
+```
+python perturbseq_run_analysis.py --sgrna MYSGNRA
+```
