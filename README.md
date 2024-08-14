@@ -18,6 +18,8 @@ bash nanostring.sh
 bash citeseq.sh
 ```
 
+for the nanostring experiment, data can be downloaded [here](10.6084/m9.figshare.26669359).
+
 
 for the perturb-seq experiment, start by downloading the data from Frangieh et al., 2021 from [here](https://github.com/theislab/sc-pert).
 

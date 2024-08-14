@@ -6,7 +6,7 @@ from tqdm import tqdm
 from cpt._utils import spatial_get_density
 
 # %%
-file = "/home/pierre/data/nanostring_bis_finished_hotspot_densities.h5ad"
+file = "nanostring_bis_finished_hotspot_densities.h5ad"
 adata = sc.read_h5ad(file)
 adata.obs.loc[:, "density"] = np.zeros(adata.shape[0])
 adata.obs.loc[:, ["X", "Y"]] = adata.obsm["X_umap_scvi"]
